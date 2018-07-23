@@ -20,22 +20,17 @@ fauxmoESP fauxmo;
 #define RELAY_2 D6
 #define LED D4
 
+int switchedOnDeviceCount = 0;
+
 void setup() 
 {
-   pinMode(LED, OUTPUT);
- 
-   //Set relay pins to outputs
-   pinMode(RELAY_1, OUTPUT);
-   pinMode(RELAY_2, OUTPUT);
+   // set pin modes
+   pinSetup();
 
-   //Set each relay pin to HIGH ====== NOTE THAT THE RELAYS USE INVERSE LOGIC =====
-   digitalWrite(RELAY_1, HIGH);   
-   delay(200);
-   digitalWrite(RELAY_2, HIGH);
-
-   
+   // start serial
    Serial.begin(SERIAL_BAUDRATE);
-   //setup and wifi connection
+   
+   // setup and wifi connection
    wifiSetup();
     
    // Device Names for Simulated Wemo switches
@@ -49,14 +44,32 @@ void loop()
 {
   fauxmo.handle();
 
-  blink();
+  blinkLED();
 }
 
-void blink() {
+void blinkLED() {
   digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
   delay(3000);                       // wait for a second
-  digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
-  delay(200);
+
+  if(switchedOnDeviceCount < 1)
+  {
+    digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
+    delay(200);
+  }
+}
+
+void pinSetup()
+{
+   pinMode(LED, OUTPUT);
+ 
+   //Set relay pins to outputs
+   pinMode(RELAY_1, OUTPUT);
+   pinMode(RELAY_2, OUTPUT);
+
+   //Set each relay pin to HIGH ====== NOTE THAT THE RELAYS USE INVERSE LOGIC =====
+   digitalWrite(RELAY_1, HIGH);   
+   delay(200);
+   digitalWrite(RELAY_2, HIGH);
 }
 
 /* ---------------------------------------------------------------------------
@@ -64,28 +77,18 @@ void blink() {
  ----------------------------------------------------------------------------*/
 void callback(uint8_t device_id, const char * device_name, bool state) 
 {
-  Serial.print("Device "); Serial.print(device_name); 
-  Serial.print(" state: ");
-  if (state) 
-  {
-    Serial.println("ON");
-  } 
-  else 
-  {
-    Serial.println("OFF");
-  }
+  logger(device_name, state);
   
   //Switching action on detection of device name
-  
   if ( (strcmp(device_name, DEVICE_ONE) == 0) ) 
   {
     if (!state) 
     {
-      digitalWrite(RELAY_1, HIGH);
+      switchOffRelay(RELAY_1);
     } 
     else 
     {
-      digitalWrite(RELAY_1, LOW);
+      switchOnRelay(RELAY_1);
     }
   }
 
@@ -93,11 +96,11 @@ void callback(uint8_t device_id, const char * device_name, bool state)
   {
     if (!state) 
     {
-      digitalWrite(RELAY_2, HIGH);
+      switchOffRelay(RELAY_2);
     } 
     else 
     {
-      digitalWrite(RELAY_2, LOW);
+      switchOnRelay(RELAY_2);
     }
   }
  
@@ -105,15 +108,15 @@ void callback(uint8_t device_id, const char * device_name, bool state)
   {
     if (!state) 
     {
-      digitalWrite(RELAY_1, HIGH);
-      digitalWrite(RELAY_2, HIGH);
+      switchOffRelays();
     } 
     else 
     {
-      digitalWrite(RELAY_1, LOW);
-      digitalWrite(RELAY_2, LOW);
+      switchOnRelays();
     }
   }
+
+  Serial.printf("Number of device on: %d", switchedOnDeviceCount);
 }
     
 /* -----------------------------------------------------------------------------
@@ -142,4 +145,42 @@ void wifiSetup()
    // Connected!
    Serial.printf("[WIFI] STATION Mode, SSID: %s, IP address: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
    Serial.println();
+}
+
+void switchOnRelay(int relay)
+{
+  digitalWrite(relay, LOW);
+  switchedOnDeviceCount = switchedOnDeviceCount + 1;
+}
+
+void switchOffRelay(int relay)
+{
+  digitalWrite(relay, HIGH);
+  switchedOnDeviceCount = switchedOnDeviceCount - 1;
+}
+
+void switchOnRelays()
+{
+  switchOnRelay(RELAY_1);
+  switchOnRelay(RELAY_2);
+}
+
+void switchOffRelays()
+{
+  switchOffRelay(RELAY_1);
+  switchOffRelay(RELAY_2);
+}
+
+void logger(const char * device_name, bool state)
+{
+  Serial.print("Device "); Serial.print(device_name); 
+  Serial.print(" state: ");
+  if (state) 
+  {
+    Serial.println("ON");
+  } 
+  else 
+  {
+    Serial.println("OFF");
+  }
 }
