@@ -12,6 +12,8 @@
 
 #define SERIAL_BAUDRATE 115200
 
+WiFiServer server(80);
+
 /* Belkin WeMo emulation */
 fauxmoESP fauxmo;
 
@@ -38,13 +40,73 @@ void setup()
    fauxmo.addDevice(DEVICE_TWO);
    fauxmo.addDevice(DEVICE_ALL);
    fauxmo.onMessage(callback); 
+   
+   server.begin();
 }
 
 void loop() 
 {
   fauxmo.handle();
-
   blinkLED();
+  webServer();
+}
+
+void webServer() {
+  WiFiClient client = server.available();
+  if(!client) {
+    return;
+  }
+
+  while(!client.available()) {
+    Serial.println("Not Returning");
+    delay(1);
+  }
+
+  String request = client.readStringUntil('\r');
+  Serial.println("Request - ");
+  Serial.println(request);
+
+  // client.flush();
+
+  if(request.indexOf("/tv/1") != -1) {
+    switchOnRelay(RELAY_1);
+  }
+  else if(request.indexOf("/tv/0") != -1) {
+    switchOffRelay(RELAY_1);
+  }
+  else if(request.indexOf("/speaker/1") != -1) {
+    switchOnRelay(RELAY_2);
+  }
+  else if(request.indexOf("/speaker/0") != -1) {
+    switchOffRelay(RELAY_2);
+  }
+  else if(request.indexOf("/all/1") != -1) {
+    switchOnRelays();
+  }
+  else if(request.indexOf("/all/0") != -1) {
+    switchOffRelays();
+  }
+
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println(""); //  do not forget this one
+  client.println("<!DOCTYPE HTML>");
+  client.println("<html>");
+  
+  client.println("<br><br>");
+  client.println("<a href=\"/tv/1\"\"><button>Turn On TV</button></a>");
+  client.println("<a href=\"/tv/0\"\"><button>Turn Off TV</button></a><br />");
+  client.println("<br><br>");
+  client.println("<a href=\"/speaker/1\"\"><button>Turn On Speaker</button></a>");
+  client.println("<a href=\"/speaker/0\"\"><button>Turn Off Speaker</button></a><br />");
+  client.println("<br><br>");
+  client.println("<a href=\"/all/1\"\"><button>Turn On All Devices</button></a>");
+  client.println("<a href=\"/all/0\"\"><button>Turn Off All Devices</button></a><br />");
+  client.println("</html>");
+ 
+  delay(1);
+  Serial.println("Client disonnected");
+  Serial.println("");
 }
 
 void blinkLED() {
@@ -68,7 +130,6 @@ void pinSetup()
 
    //Set each relay pin to HIGH ====== NOTE THAT THE RELAYS USE INVERSE LOGIC =====
    digitalWrite(RELAY_1, HIGH);   
-   delay(200);
    digitalWrite(RELAY_2, HIGH);
 }
 
@@ -125,7 +186,7 @@ void callback(uint8_t device_id, const char * device_name, bool state)
 void wifiSetup() 
 {
    // Set WIFI module to STA mode
-   WiFi.mode(WIFI_STA);
+   // WiFi.mode(WIFI_STA);
 
    // Connect
    Serial.println ();
@@ -139,7 +200,7 @@ void wifiSetup()
       Serial.print(".");
       delay(100);
    }
-   Serial.print(" ==> CONNECTED!" );
+   Serial.println("CONNECTED!");
    Serial.println();
 
    // Connected!
