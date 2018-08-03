@@ -8,7 +8,6 @@
 
 #define DEVICE_ONE "TV"
 #define DEVICE_TWO "Speaker"
-#define DEVICE_ALL "All Devices"
 
 #define SERIAL_BAUDRATE 115200
 
@@ -20,9 +19,13 @@ fauxmoESP fauxmo;
 /* Set Relay Pins */
 #define RELAY_1 D5
 #define RELAY_2 D6
+#define RELAY_3 D7
+#define RELAY_4 D8
+
 #define LED D4
 
-int switchedOnDeviceCount = 0;
+bool statusTv = false;
+bool statusSpeaker = false;
 
 void setup() 
 {
@@ -38,7 +41,7 @@ void setup()
    // Device Names for Simulated Wemo switches
    fauxmo.addDevice(DEVICE_ONE);
    fauxmo.addDevice(DEVICE_TWO);
-   fauxmo.addDevice(DEVICE_ALL);
+
    fauxmo.onMessage(callback); 
    
    server.begin();
@@ -69,41 +72,41 @@ void webServer() {
   // client.flush();
 
   if(request.indexOf("/tv/1") != -1) {
-    switchOnRelay(RELAY_1);
+    switchOnTv();
   }
   else if(request.indexOf("/tv/0") != -1) {
-    switchOffRelay(RELAY_1);
+    switchOffTv();
   }
   else if(request.indexOf("/speaker/1") != -1) {
-    switchOnRelay(RELAY_2);
+    switchOnSpeaker();
   }
   else if(request.indexOf("/speaker/0") != -1) {
-    switchOffRelay(RELAY_2);
+    switchOffSpeaker();
   }
   else if(request.indexOf("/all/1") != -1) {
-    switchOnRelays();
+    switchOnAll();
   }
   else if(request.indexOf("/all/0") != -1) {
-    switchOffRelays();
+    switchOffAll();
   }
 
+  String json = "[";
+  json.concat("{\"name\":\"TV\", \"url\":\"tv\", \"state\":");
+  json.concat(statusTv);
+  json.concat("},");
+  json.concat("{\"name\":\"Speaker\", \"url\":\"speaker\", \"state\":");
+  json.concat(statusSpeaker);
+  json.concat("}");
+  json.concat("]");
+
+  Serial.println(json);
+
   client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: text/html");
+  client.println("Content-Type: application/json");
   client.println(""); //  do not forget this one
-  client.println("<!DOCTYPE HTML>");
-  client.println("<html>");
+
+  client.println(json);
   
-  client.println("<br><br>");
-  client.println("<a href=\"/tv/1\"\"><button>Turn On TV</button></a>");
-  client.println("<a href=\"/tv/0\"\"><button>Turn Off TV</button></a><br />");
-  client.println("<br><br>");
-  client.println("<a href=\"/speaker/1\"\"><button>Turn On Speaker</button></a>");
-  client.println("<a href=\"/speaker/0\"\"><button>Turn Off Speaker</button></a><br />");
-  client.println("<br><br>");
-  client.println("<a href=\"/all/1\"\"><button>Turn On All Devices</button></a>");
-  client.println("<a href=\"/all/0\"\"><button>Turn Off All Devices</button></a><br />");
-  client.println("</html>");
- 
   delay(1);
   Serial.println("Client disonnected");
   Serial.println("");
@@ -113,7 +116,7 @@ void blinkLED() {
   digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
   delay(3000);                       // wait for a second
 
-  if(switchedOnDeviceCount < 1)
+  if(!(statusSpeaker || statusTv))
   {
     digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
     delay(200);
@@ -127,10 +130,16 @@ void pinSetup()
    //Set relay pins to outputs
    pinMode(RELAY_1, OUTPUT);
    pinMode(RELAY_2, OUTPUT);
+   pinMode(RELAY_3, OUTPUT);
+   pinMode(RELAY_4, OUTPUT);
 
    //Set each relay pin to HIGH ====== NOTE THAT THE RELAYS USE INVERSE LOGIC =====
    digitalWrite(RELAY_1, HIGH);   
    digitalWrite(RELAY_2, HIGH);
+
+   // Always on pins
+   digitalWrite(RELAY_3, LOW);   
+   digitalWrite(RELAY_4, LOW);
 }
 
 /* ---------------------------------------------------------------------------
@@ -145,11 +154,11 @@ void callback(uint8_t device_id, const char * device_name, bool state)
   {
     if (!state) 
     {
-      switchOffRelay(RELAY_1);
+      switchOffTv();
     } 
     else 
     {
-      switchOnRelay(RELAY_1);
+      switchOnTv();
     }
   }
 
@@ -157,27 +166,59 @@ void callback(uint8_t device_id, const char * device_name, bool state)
   {
     if (!state) 
     {
-      switchOffRelay(RELAY_2);
+      switchOffSpeaker();
     } 
     else 
     {
-      switchOnRelay(RELAY_2);
+      switchOnSpeaker();
     }
   }
- 
-  if ( (strcmp(device_name, DEVICE_ALL) == 0) ) 
-  {
-    if (!state) 
-    {
-      switchOffRelays();
-    } 
-    else 
-    {
-      switchOnRelays();
-    }
-  }
+}
 
-  Serial.printf("Number of device on: %d", switchedOnDeviceCount);
+void switchOnTv()
+{
+  switchOnRelay(RELAY_1);
+  statusTv = true;
+}
+
+void switchOffTv()
+{
+  switchOffRelay(RELAY_1);
+  statusTv = false;
+}
+
+void switchOnSpeaker()
+{
+  switchOnRelay(RELAY_2);
+  statusSpeaker = true;
+}
+
+void switchOffSpeaker()
+{
+  switchOffRelay(RELAY_2);
+  statusSpeaker = false;
+}
+
+void switchOnAll()
+{
+  switchOnTv();
+  switchOnSpeaker();
+}
+
+void switchOffAll()
+{
+  switchOffTv();
+  switchOffSpeaker();
+}
+
+void switchOnRelay(int relay)
+{
+  digitalWrite(relay, LOW);
+}
+
+void switchOffRelay(int relay)
+{
+  digitalWrite(relay, HIGH);
 }
     
 /* -----------------------------------------------------------------------------
@@ -185,9 +226,6 @@ void callback(uint8_t device_id, const char * device_name, bool state)
  -----------------------------------------------------------------------------*/
 void wifiSetup() 
 {
-   // Set WIFI module to STA mode
-   // WiFi.mode(WIFI_STA);
-
    // Connect
    Serial.println ();
    Serial.printf("[WIFI] Connecting to %s ", WIFI_SSID);
@@ -206,30 +244,6 @@ void wifiSetup()
    // Connected!
    Serial.printf("[WIFI] STATION Mode, SSID: %s, IP address: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
    Serial.println();
-}
-
-void switchOnRelay(int relay)
-{
-  digitalWrite(relay, LOW);
-  switchedOnDeviceCount = switchedOnDeviceCount + 1;
-}
-
-void switchOffRelay(int relay)
-{
-  digitalWrite(relay, HIGH);
-  switchedOnDeviceCount = switchedOnDeviceCount - 1;
-}
-
-void switchOnRelays()
-{
-  switchOnRelay(RELAY_1);
-  switchOnRelay(RELAY_2);
-}
-
-void switchOffRelays()
-{
-  switchOffRelay(RELAY_1);
-  switchOffRelay(RELAY_2);
 }
 
 void logger(const char * device_name, bool state)
