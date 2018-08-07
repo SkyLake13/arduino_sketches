@@ -1,3 +1,8 @@
+#include <IRremoteESP8266.h>
+#include <IRrecv.h>
+#include <IRutils.h>
+#include <IRsend.h>
+
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include "fauxmoESP.h"
@@ -17,15 +22,25 @@ WiFiServer server(80);
 fauxmoESP fauxmo;
 
 /* Set Relay Pins */
+#define IR_TRANSMETER D2
+#define IR_RECEIVER D3
+
+#define LED D4
+
 #define RELAY_1 D5
 #define RELAY_2 D6
 #define RELAY_3 D7
 #define RELAY_4 D8
 
-#define LED D4
+IRrecv irrecv(IR_RECEIVER);
+decode_results results;
+
+IRsend irsend(IR_TRANSMETER);  // Set the GPIO to be used to sending the message.
 
 bool statusTv = false;
 bool statusSpeaker = false;
+
+uint16_t rawData[1] = {21516};
 
 void setup() 
 {
@@ -45,6 +60,8 @@ void setup()
    fauxmo.onMessage(callback); 
    
    server.begin();
+   irrecv.enableIRIn(); // Start the receiver
+   irsend.begin();
 }
 
 void loop() 
@@ -52,6 +69,30 @@ void loop()
   fauxmo.handle();
   blinkLED();
   webServer();
+
+  irReceiver();
+}
+
+void irReceiver()
+{
+  if (irrecv.decode(&results))
+  {
+     if (results.decode_type == NEC) {
+        Serial.print("NEC: ");
+      } else if (results.decode_type == SONY) {
+        Serial.print("SONY: ");
+      } else if (results.decode_type == RC5) {
+        Serial.print("RC5: ");
+      } else if (results.decode_type == RC6) {
+        Serial.print("RC6: ");
+      } else if (results.decode_type == UNKNOWN) {
+        Serial.print("UNKNOWN: ");
+      }
+      serialPrintUint64(results.value, HEX);
+      serialPrintUint64(results.bits);
+      Serial.println();
+      irrecv.resume(); // Receive the next value
+  }
 }
 
 void webServer() {
@@ -103,10 +144,10 @@ void webServer() {
 
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: application/json");
-  client.println(""); //  do not forget this one
-
+  client.println(); //  do not forget this one
   client.println(json);
-  
+  client.println(); //  do not forget this one
+    
   delay(1);
   Serial.println("Client disonnected");
   Serial.println("");
@@ -191,6 +232,8 @@ void switchOnSpeaker()
 {
   switchOnRelay(RELAY_2);
   statusSpeaker = true;
+  delay(500);
+  irsend.sendSony(0x540C, 15, 2);
 }
 
 void switchOffSpeaker()
