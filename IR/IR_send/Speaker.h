@@ -6,10 +6,10 @@ class Speaker {
   private:
     String name;
     int frequency;
-    IRsend& irSend;
+    IRsend & irSend;
   
   public:
-    Speaker(IRsend& _irSend): irSend(_irSend) {
+    Speaker(IRsend & _irSend): irSend(_irSend) {
     this->frequency = 38;
     this->name = "Speaker";
   }

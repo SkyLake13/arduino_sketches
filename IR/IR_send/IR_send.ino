@@ -6,8 +6,11 @@
 #include "Speaker.h";
 #include "Tv.h";
 #include "WifiSetup.h";
+#include "StatusLED.h";
 
 const uint16_t transmitterPin = D2;  // ESP8266 GPIO pin to use. Recommended: 4 (D2).
+
+StatusLED statusLED(D4);
 
 WifiSetup wifiSetup;
 
@@ -31,6 +34,7 @@ void setup() {
 
 void loop() {
   webServer();
+  statusLED.shortBlink();
 }
 
 void webServer() {

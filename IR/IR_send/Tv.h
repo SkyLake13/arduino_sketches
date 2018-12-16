@@ -5,10 +5,10 @@ class Tv {
   private:
     String name;
     int frequency;
-    IRsend& irSend;
+    IRsend & irSend;
   
   public:
-    Tv(IRsend& _irSend): irSend(_irSend) {
+    Tv(IRsend & _irSend): irSend(_irSend) {
       this->frequency = 32;
       this->name = "Tv";
     }
