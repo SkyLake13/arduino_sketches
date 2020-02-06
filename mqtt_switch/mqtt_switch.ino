@@ -26,6 +26,10 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>  
+
 // Update these with values suitable for your network.
 
 const char* ssid = "Skylake";
@@ -47,6 +51,32 @@ PubSubClient client(espClient);
 
 #define DEVICE_ONE_EVENT "tv-event"
 #define DEVICE_TWO_EVENT "speaker-event"
+
+
+void setup_wifi() {
+
+  delay(10);
+  // We start by connecting to a WiFi network
+  Serial.println();
+  Serial.print("Connecting...");
+
+   WiFiManager wifiManager;
+
+   if (!wifiManager.autoConnect("Mqtt-Switch")) {
+    Serial.println("failed to connect and hit timeout");
+    delay(3000);
+    //reset and try again, or maybe put it to deep sleep
+    ESP.reset();
+    delay(5000);
+  }
+
+  randomSeed(micros());
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
 
 void setup_wifi() {
 
